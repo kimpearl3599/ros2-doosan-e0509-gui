@@ -291,6 +291,6 @@ docker exec -it -e DISPLAY=$DISPLAY ros2-doosan bash
 
 ## 라이선스
 
-이 프로젝트는 교육 목적으로 제작되었습니다.
+이 프로젝트는 과제 목적으로 제작되었습니다.
 - Doosan Robotics: [doosan-robot2](https://github.com/DoosanRobotics/doosan-robot2)
 - MoveIt2: [moveit2](https://github.com/moveit/moveit2)
