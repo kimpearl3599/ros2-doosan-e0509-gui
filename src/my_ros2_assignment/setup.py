@@ -22,7 +22,7 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'my_node = my_ros2_assignment.main_node:main',
+            'robot_gui = my_ros2_assignment.main_node:main',
         ],
     },
 )

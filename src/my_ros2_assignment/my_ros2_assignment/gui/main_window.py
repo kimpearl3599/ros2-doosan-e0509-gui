@@ -424,29 +424,27 @@ class MainWindow(QMainWindow):
         self.coord_list_widget.setMinimumHeight(120)
         layout.addWidget(self.coord_list_widget)
 
-        # 버튼 행 1: 삭제
-        btn_row1 = QHBoxLayout()
+        # 버튼 행: 삭제/저장/불러오기/초기화
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
+
         self.btn_remove_coord = self._create_secondary_button('삭제')
         self.btn_remove_coord.clicked.connect(self._on_remove_coord)
-        btn_row1.addWidget(self.btn_remove_coord)
-        btn_row1.addStretch()
-        layout.addLayout(btn_row1)
+        btn_row.addWidget(self.btn_remove_coord)
 
-        # 버튼 행 2: 저장/불러오기/초기화
-        btn_row2 = QHBoxLayout()
         self.btn_save = self._create_secondary_button('저장')
         self.btn_save.clicked.connect(self._on_save_coords)
-        btn_row2.addWidget(self.btn_save)
+        btn_row.addWidget(self.btn_save)
 
         self.btn_load = self._create_secondary_button('불러오기')
         self.btn_load.clicked.connect(self._on_load_coords)
-        btn_row2.addWidget(self.btn_load)
+        btn_row.addWidget(self.btn_load)
 
         self.btn_clear = self._create_secondary_button('초기화')
         self.btn_clear.clicked.connect(self._on_clear_list)
-        btn_row2.addWidget(self.btn_clear)
+        btn_row.addWidget(self.btn_clear)
 
-        layout.addLayout(btn_row2)
+        layout.addLayout(btn_row)
 
         group.setLayout(layout)
         return group

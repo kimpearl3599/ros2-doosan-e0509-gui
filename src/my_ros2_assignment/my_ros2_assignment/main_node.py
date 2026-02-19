@@ -33,6 +33,7 @@ class RobotGUINode(Node):
         self._pending_validate_coord = None
         self._pending_return_future = None
         self._pending_return_type = None  # 'previous' or 'home'
+        self._pending_fkin_future = None  # FK 요청 중복 방지
 
         # GUI 시그널 연결
         self.window.request_move.connect(self._on_request_move)
@@ -42,10 +43,10 @@ class RobotGUINode(Node):
         self.window.request_return_previous.connect(self._on_request_return_previous)
         self.window.request_home_return.connect(self._on_request_home_return)
 
-        # 상태 업데이트 타이머 (500ms 주기)
+        # 상태 업데이트 타이머 (1000ms 주기 - 에뮬레이터 큐 과부하 방지)
         self._status_timer = QTimer()
         self._status_timer.timeout.connect(self._update_status)
-        self._status_timer.start(500)
+        self._status_timer.start(1000)
 
         self.window.append_log('시스템 초기화 완료')
         self.window.append_log('에뮬레이터와 Gazebo가 실행 중이어야 합니다.')
@@ -68,12 +69,14 @@ class RobotGUINode(Node):
         self._move_thread.joint_updated.connect(self.window.update_joints)
         self._move_thread.position_updated.connect(self.window.update_ee_position)
         self._move_thread.status_changed.connect(self.window.update_motion_status)
-        self._move_thread.movement_started.connect(lambda: self.window.set_moving_state(True))
         self._move_thread.movement_finished.connect(lambda: self.window.set_moving_state(False))
         self._move_thread.movement_error.connect(
             lambda msg: self.window.append_log(f'오류: {msg}')
         )
         self._move_thread.position_before_move.connect(self.window.add_position_to_history)
+
+        # 스레드 시작 전에 버튼 상태 변경 (정지 버튼 활성화)
+        self.window.set_moving_state(True)
 
         self._move_thread.set_targets(targets, velocity, acceleration, is_absolute)
         self._move_thread.start()
@@ -239,10 +242,12 @@ class RobotGUINode(Node):
         joints = self.controller.get_current_joints()
         self.window.update_joints(joints)
 
-        # FK로 EE 위치 계산
-        future = self.controller._get_position_by_fkin()
-        if future is not None:
-            future.add_done_callback(self._on_fkin_result)
+        # FK로 EE 위치 계산 (이전 요청이 완료된 경우에만 새 요청)
+        if self._pending_fkin_future is None or self._pending_fkin_future.done():
+            future = self.controller._get_position_by_fkin()
+            if future is not None:
+                self._pending_fkin_future = future
+                future.add_done_callback(self._on_fkin_result)
 
     def _on_fkin_result(self, future):
         """FK 결과 콜백"""
