@@ -42,7 +42,24 @@ pip3 install pyqt5 numpy
 
 ## 실행 매뉴얼
 
-### 1. Docker 컨테이너 접속
+### 간편 실행 (권장)
+
+호스트 시스템에서 스크립트를 사용하여 간편하게 실행할 수 있습니다:
+
+```bash
+# 전체 시작 (시뮬레이션 + GUI)
+./start_all.sh
+
+# 시뮬레이션만 시작
+./start_simulation.sh
+
+# GUI만 시작 (시뮬레이션이 이미 실행 중일 때)
+./start_gui.sh
+```
+
+### 수동 실행
+
+#### 1. Docker 컨테이너 접속
 ```bash
 # 컨테이너 시작
 docker start ros2-doosan
@@ -51,30 +68,27 @@ docker start ros2-doosan
 docker exec -it ros2-doosan bash
 ```
 
-### 2. 두산 에뮬레이터 실행 (터미널 1)
+#### 2. 두산 에뮬레이터 실행 (터미널 1)
 ```bash
 # 컨테이너 내부에서
 docker run -d --name dsr01_emulator --network host doosanrobot/dsr_emulator:3.0.1
 ```
 
-### 3. Gazebo 시뮬레이션 실행 (터미널 2)
+#### 3. Gazebo 시뮬레이션 실행 (터미널 2)
 ```bash
 docker exec -it ros2-doosan bash
 ros2 launch dsr_bringup2 dsr_bringup2_gazebo.launch.py model:=e0509
 ```
 
-### 4. GUI 실행 (터미널 3)
+> **중요**: Gazebo 창이 열리면 **Play 버튼(▶)**을 클릭해야 시뮬레이션이 시작됩니다.
+
+#### 4. GUI 실행 (터미널 3)
 ```bash
 docker exec -it ros2-doosan bash
 cd ~/ros2_ws
 colcon build --packages-select my_ros2_assignment
 source install/setup.bash
-ros2 run my_ros2_assignment my_node
-```
-
-### 단일 명령 실행 (Launch 파일)
-```bash
-ros2 launch my_ros2_assignment full_simulation.launch.py
+ros2 run my_ros2_assignment robot_gui
 ```
 
 ---
@@ -99,6 +113,7 @@ ros2 launch my_ros2_assignment full_simulation.launch.py
 │  - 좌표 목록 순회                                            │
 │  - 비동기 이동 명령 실행                                      │
 │  - 정지 플래그 감시                                          │
+│  - 목표 도달 확인 (FK로 5mm 오차 이내 확인)                   │
 └─────────────────────┬───────────────────────────────────────┘
                       │ ROS2 Service Call
 ┌─────────────────────▼───────────────────────────────────────┐
@@ -107,6 +122,7 @@ ros2 launch my_ros2_assignment full_simulation.launch.py
 │  - /dsr01/motion/move_joint (관절 이동)                      │
 │  - /dsr01/motion/move_stop (즉시 정지)                       │
 │  - /dsr01/motion/ikin (역기구학 검증)                        │
+│  - /dsr01/motion/fkin (순기구학 - EE 위치 계산)              │
 │  - /dsr01/joint_states (관절 상태 구독)                      │
 └─────────────────────┬───────────────────────────────────────┘
                       │ ROS2 Topic/Service
@@ -119,9 +135,10 @@ ros2 launch my_ros2_assignment full_simulation.launch.py
 1. 사용자가 목표 좌표 (X, Y, Z, RX, RY, RZ) 입력
 2. 역기구학(Ikin) 서비스로 도달 가능 여부 검증
 3. 검증 통과 시 좌표 목록에 추가
-4. "실행" 클릭 시 MoveThread 시작
-5. MoveLine 서비스로 순차 이동
-6. 실시간 관절/위치 상태 업데이트
+4. "실행" 클릭 시 현재 위치 저장 후 MoveThread 시작
+5. MoveLine 서비스로 순차 이동 명령 전송
+6. FK로 현재 위치 계산하여 목표 도달 확인 (5mm 오차 허용)
+7. 실시간 관절/위치 상태 업데이트
 
 ---
 
@@ -158,13 +175,13 @@ ros2 launch my_ros2_assignment full_simulation.launch.py
 - 정지 버튼 클릭 시 **현재 위치에서 즉시 정지**
 - MoveStop 서비스 호출로 로봇 동작 중단
 
-### 6. 안전 기능 (신규)
+### 6. 안전 기능
 | 기능 | 설명 |
 |------|------|
-| 이전 위치 복귀 | 정지 후 마지막으로 도달한 위치로 복귀 |
+| 이전 위치 복귀 | 이동 시작 전 위치로 복귀 |
 | 홈 복귀 | 작업 자세 (싱귤러리티 회피 자세)로 복귀 |
 
-### 7. 좌표 저장/불러오기 (신규)
+### 7. 좌표 저장/불러오기
 | 기능 | 설명 |
 |------|------|
 | 좌표 저장 | 현재 좌표 목록을 JSON 파일로 저장 |
@@ -173,6 +190,7 @@ ros2 launch my_ros2_assignment full_simulation.launch.py
 **저장 파일 형식** (JSON):
 ```json
 {
+  "version": "1.0",
   "coordinates": [
     {"x": 350.0, "y": 0.0, "z": 400.0, "rx": 0.0, "ry": 180.0, "rz": 0.0},
     {"x": 400.0, "y": 100.0, "z": 300.0, "rx": 0.0, "ry": 180.0, "rz": 0.0}
@@ -217,9 +235,10 @@ ros2 launch my_ros2_assignment full_simulation.launch.py
 │ ┌─ 좌표 목록 ─────────────┐ │                                    │
 │ │ 1. pos(350, 0, 400)     │ │ ┌─ 실시간 로그 ────────────────────┐│
 │ │ 2. pos(400, 100, 300)   │ │ │ [10:30:01] 시스템 초기화 완료   ││
-│ │ [삭제] [저장] [불러오기]│ │ │ [10:30:05] 로봇 연결됨          ││
-│ └─────────────────────────┘ │ │ [10:30:10] 작업 자세 전환 완료  ││
-│                            │ └────────────────────────────────┘│
+│ │ [삭제][저장][불러오기]  │ │ │ [10:30:05] 로봇 연결됨          ││
+│ │ [초기화]                │ │ │ [10:30:10] 작업 자세 전환 완료  ││
+│ └─────────────────────────┘ │ └────────────────────────────────┘│
+│                            │                                    │
 │ ┌─ 옵션 설정 ─────────────┐ │                                    │
 │ │ ○ 절대 좌표 ○ 상대 좌표│ │                                    │
 │ │ 속도: [100] 가속도:[100]│ │                                    │
@@ -228,7 +247,6 @@ ros2 launch my_ros2_assignment full_simulation.launch.py
 │ ┌─ 실행 ─────────────────┐ │                                    │
 │ │ [▶ 실행]    [■ 정지]   │ │                                    │
 │ │ [⟲ 이전위치] [⌂ 홈복귀]│ │                                    │
-│ │ [목록 초기화]          │ │                                    │
 │ └─────────────────────────┘ │                                    │
 └────────────────────────────┴────────────────────────────────────┘
 ```
@@ -292,7 +310,7 @@ my_ros2_assignment/
 
 ---
 
-## 문제 해결
+## 문제 해결 (Troubleshooting)
 
 ### 로봇 연결 안됨
 ```bash
@@ -304,6 +322,37 @@ docker stop dsr01_emulator
 docker rm dsr01_emulator
 docker run -d --name dsr01_emulator --network host doosanrobot/dsr_emulator:3.0.1
 ```
+
+### Gazebo에서 로봇이 안 보임
+- Gazebo 창에서 **Play 버튼(▶)**을 클릭해야 시뮬레이션이 시작됩니다.
+- Play 버튼 클릭 후 `/dsr01/gz/controller_manager` 노드가 활성화됩니다.
+
+### 에뮬레이터 큐 과부하 (서비스 응답 지연)
+**증상**: Docker 로그에 `The size of queue: N` 메시지가 계속 증가
+```bash
+# 에뮬레이터 로그 확인
+docker logs dsr01_emulator | tail -20
+```
+
+**해결**: 에뮬레이터와 시뮬레이션 모두 재시작
+```bash
+# 1. GUI 종료 (Ctrl+C)
+# 2. 에뮬레이터 재시작
+docker stop dsr01_emulator && docker rm dsr01_emulator
+docker run -d --name dsr01_emulator --network host doosanrobot/dsr_emulator:3.0.1
+
+# 3. Gazebo 재시작 (터미널에서 Ctrl+C 후 다시 실행)
+```
+
+### 서비스 호출 타임아웃
+**증상**: `서비스 응답 대기 타임아웃` 메시지
+- 에뮬레이터 큐가 막혀있을 가능성이 높습니다.
+- 위의 "에뮬레이터 큐 과부하" 해결 방법을 따르세요.
+
+### GUI 파일 다이얼로그 멈춤 (Docker 환경)
+**증상**: 저장/불러오기 버튼 클릭 시 GUI 전체가 멈춤
+- Docker X11 환경에서 네이티브 파일 다이얼로그 호환성 문제입니다.
+- 코드에서 `QFileDialog.DontUseNativeDialog` 옵션을 사용하여 해결했습니다.
 
 ### 빌드 오류
 ```bash
@@ -321,8 +370,16 @@ docker exec -it -e DISPLAY=$DISPLAY ros2-doosan bash
 
 ---
 
+## 알려진 제한사항
+
+1. **정지 후 재시작**: 정지 명령 후 에뮬레이터 큐가 막힐 수 있어 재시작이 필요할 수 있습니다.
+2. **서비스 응답 시간**: MoveLine 서비스는 명령 접수 시 즉시 응답하며, 실제 이동 완료는 FK로 확인합니다.
+3. **상태 업데이트 주기**: 에뮬레이터 부하 방지를 위해 1초 간격으로 상태를 업데이트합니다.
+
+---
+
 ## 라이선스
 
-이 프로젝트는 과제 목적으로 제작되었습니다.
+이 프로젝트는 채용 과제 목적으로 제작되었습니다.
 - Doosan Robotics: [doosan-robot2](https://github.com/DoosanRobotics/doosan-robot2)
 - MoveIt2: [moveit2](https://github.com/moveit/moveit2)
