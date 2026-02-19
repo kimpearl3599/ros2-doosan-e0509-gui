@@ -73,6 +73,7 @@ class RobotGUINode(Node):
         self._move_thread.movement_error.connect(
             lambda msg: self.window.append_log(f'오류: {msg}')
         )
+        self._move_thread.position_before_move.connect(self.window.add_position_to_history)
 
         self._move_thread.set_targets(targets, velocity, acceleration, is_absolute)
         self._move_thread.start()

@@ -14,6 +14,7 @@ class MoveThread(QThread):
     movement_finished = pyqtSignal()
     movement_error = pyqtSignal(str)
     status_changed = pyqtSignal(str)  # 대기, 이동 중, 완료, 정지, 오류
+    position_before_move = pyqtSignal(float, float, float, float, float, float)  # 이동 전 위치 기록용
 
     def __init__(self, controller: RobotController, node):
         super().__init__()
@@ -99,6 +100,8 @@ class MoveThread(QThread):
                 result = future.result()
                 if result.success:
                     self.log_message.emit(f'[{i+1}/{total}] 목표 도달 완료')
+                    # 성공한 위치를 이전 위치로 기록
+                    self.position_before_move.emit(x, y, z, rx, ry, rz)
                 else:
                     self.log_message.emit(f'[{i+1}/{total}] 이동 실패')
                     self.movement_error.emit(f'목표 {i+1} 이동 실패')
