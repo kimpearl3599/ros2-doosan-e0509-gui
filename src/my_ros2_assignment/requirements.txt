@@ -1,0 +1,75 @@
+# ============================================
+# Doosan E0509 Robot Control GUI - Dependencies
+# ============================================
+
+# ============================================
+# APT Packages (sudo apt install)
+# ============================================
+
+# ROS2 Humble (Ubuntu 22.04)
+ros-humble-desktop
+ros-humble-moveit
+ros-humble-gazebo-ros-pkgs
+
+# ROS2 Robot Control
+ros-humble-joint-state-publisher
+ros-humble-joint-state-publisher-gui
+ros-humble-robot-state-publisher
+ros-humble-xacro
+ros-humble-controller-manager
+ros-humble-ros2-control
+ros-humble-ros2-controllers
+ros-humble-gripper-controllers
+
+# Build Tools
+python3-colcon-common-extensions
+python3-rosdep
+
+# ============================================
+# PIP Packages (pip3 install)
+# ============================================
+
+# GUI
+PyQt5>=5.15.0
+
+# Numerical Computing
+numpy>=1.21.0
+
+# ============================================
+# Docker Images
+# ============================================
+
+# Doosan Robot Emulator
+# docker pull doosanrobot/dsr_emulator:3.0.1
+
+# ============================================
+# ROS2 Packages (from source)
+# ============================================
+
+# Doosan Robot2 Package
+# git clone -b humble-devel https://github.com/DoosanRobotics/doosan-robot2.git
+
+# ============================================
+# Installation Commands
+# ============================================
+
+# 1. APT packages:
+# sudo apt update
+# sudo apt install -y ros-humble-desktop ros-humble-moveit ros-humble-gazebo-ros-pkgs \
+#     ros-humble-joint-state-publisher ros-humble-joint-state-publisher-gui \
+#     ros-humble-robot-state-publisher ros-humble-xacro ros-humble-controller-manager \
+#     ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-gripper-controllers \
+#     python3-colcon-common-extensions python3-rosdep
+
+# 2. PIP packages:
+# pip3 install pyqt5 numpy
+
+# 3. Doosan package:
+# cd ~/ros2_ws/src
+# git clone -b humble-devel https://github.com/DoosanRobotics/doosan-robot2.git
+# cd ~/ros2_ws
+# rosdep install --from-paths src --ignore-src -r -y
+# colcon build
+
+# 4. Emulator:
+# docker pull doosanrobot/dsr_emulator:3.0.1
