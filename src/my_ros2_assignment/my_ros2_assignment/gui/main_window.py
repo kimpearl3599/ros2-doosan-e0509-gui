@@ -831,29 +831,38 @@ class MainWindow(QMainWindow):
             self.append_log('저장할 좌표가 없습니다.')
             return
 
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, '좌표 저장', '', 'JSON Files (*.json)')
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, 'Save Coordinates', '', 'JSON Files (*.json)',
+                options=QFileDialog.DontUseNativeDialog)
 
-        if file_path:
-            data = {
-                'version': '1.0',
-                'settings': {
-                    'velocity': float(self.input_velocity.text() or 100),
-                    'acceleration': float(self.input_accel.text() or 100),
-                    'is_absolute': self.radio_absolute.isChecked()
-                },
-                'coordinates': [
-                    {'x': c[0], 'y': c[1], 'z': c[2], 'rx': c[3], 'ry': c[4], 'rz': c[5]}
-                    for c in self._coord_list
-                ]
-            }
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            self.append_log(f'좌표 저장: {file_path}')
+            if file_path:
+                # 확장자가 없으면 .json 추가
+                if not file_path.endswith('.json'):
+                    file_path += '.json'
+
+                data = {
+                    'version': '1.0',
+                    'settings': {
+                        'velocity': float(self.input_velocity.text() or 100),
+                        'acceleration': float(self.input_accel.text() or 100),
+                        'is_absolute': self.radio_absolute.isChecked()
+                    },
+                    'coordinates': [
+                        {'x': c[0], 'y': c[1], 'z': c[2], 'rx': c[3], 'ry': c[4], 'rz': c[5]}
+                        for c in self._coord_list
+                    ]
+                }
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                self.append_log(f'좌표 저장: {file_path}')
+        except Exception as e:
+            self.append_log(f'저장 오류: {str(e)}')
 
     def _on_load_coords(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, '좌표 불러오기', '', 'JSON Files (*.json)')
+            self, 'Load Coordinates', '', 'JSON Files (*.json);;All Files (*)',
+            options=QFileDialog.DontUseNativeDialog)
 
         if file_path:
             try:
