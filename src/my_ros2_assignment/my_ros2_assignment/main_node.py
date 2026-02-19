@@ -31,12 +31,16 @@ class RobotGUINode(Node):
         self._pending_pose_type = None
         self._pending_validate_future = None
         self._pending_validate_coord = None
+        self._pending_return_future = None
+        self._pending_return_type = None  # 'previous' or 'home'
 
         # GUI 시그널 연결
         self.window.request_move.connect(self._on_request_move)
         self.window.request_stop.connect(self._on_request_stop)
         self.window.request_validate.connect(self._on_request_validate)
         self.window.request_ready_pose.connect(self._on_request_ready_pose)
+        self.window.request_return_previous.connect(self._on_request_return_previous)
+        self.window.request_home_return.connect(self._on_request_home_return)
 
         # 상태 업데이트 타이머 (500ms 주기)
         self._status_timer = QTimer()
@@ -114,6 +118,63 @@ class RobotGUINode(Node):
         self._pending_pose_future = future
         self._pending_pose_type = 'ready'
 
+    def _on_request_return_previous(self):
+        """이전 위치로 복귀 요청"""
+        if self._move_thread is not None and self._move_thread.isRunning():
+            self.window.append_log('이동 중에는 이전 위치 복귀가 불가능합니다.')
+            return
+
+        if not self.controller.is_connected:
+            self.window.append_log('로봇이 연결되지 않았습니다.')
+            return
+
+        prev_pos = self.window.get_previous_position()
+        if prev_pos is None:
+            self.window.append_log('저장된 이전 위치가 없습니다.')
+            return
+
+        x, y, z, rx, ry, rz = prev_pos
+        self.window.append_log(f'이전 위치로 복귀 중: ({x:.1f}, {y:.1f}, {z:.1f})')
+        self.window.update_motion_status('이전 위치 복귀 중')
+
+        future = self.controller.move_to_position(
+            x, y, z, rx, ry, rz,
+            velocity=100.0, acceleration=100.0,
+            is_absolute=True
+        )
+
+        if future is None:
+            self.window.append_log('이동 서비스 호출 실패')
+            self.window.update_motion_status('오류')
+            return
+
+        self._pending_return_future = future
+        self._pending_return_type = 'previous'
+
+    def _on_request_home_return(self):
+        """홈 위치(작업 자세)로 복귀 요청"""
+        if self._move_thread is not None and self._move_thread.isRunning():
+            self.window.append_log('이동 중에는 홈 복귀가 불가능합니다.')
+            return
+
+        if not self.controller.is_connected:
+            self.window.append_log('로봇이 연결되지 않았습니다.')
+            return
+
+        self.window.append_log('홈 위치(작업 자세)로 복귀 중...')
+        self.window.update_motion_status('홈 복귀 중')
+
+        # 작업 자세(싱귤러리티 회피)로 이동
+        future = self.controller.move_to_ready_position(velocity=30.0, acceleration=30.0)
+
+        if future is None:
+            self.window.append_log('이동 서비스 호출 실패')
+            self.window.update_motion_status('오류')
+            return
+
+        self._pending_return_future = future
+        self._pending_return_type = 'home'
+
     def _update_status(self):
         """주기적으로 로봇 상태 업데이트"""
         # 연결 상태
@@ -147,6 +208,28 @@ class RobotGUINode(Node):
                 finally:
                     self._pending_validate_future = None
                     self._pending_validate_coord = None
+
+        # 대기 중인 복귀 Future 확인 (이전 위치 / 홈)
+        if self._pending_return_future is not None:
+            if self._pending_return_future.done():
+                try:
+                    result = self._pending_return_future.result()
+                    success = result.success if hasattr(result, 'success') else True
+                    if success:
+                        if self._pending_return_type == 'previous':
+                            self.window.append_log('이전 위치 복귀 완료')
+                        else:
+                            self.window.append_log('홈 복귀 완료')
+                        self.window.update_motion_status('대기')
+                    else:
+                        self.window.append_log('복귀 실패')
+                        self.window.update_motion_status('오류')
+                except Exception as e:
+                    self.window.append_log(f'복귀 오류: {str(e)}')
+                    self.window.update_motion_status('오류')
+                finally:
+                    self._pending_return_future = None
+                    self._pending_return_type = None
 
         if not self.controller.is_connected:
             return
